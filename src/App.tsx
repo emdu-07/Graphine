@@ -7,6 +7,7 @@ import {
 import { MotionStage } from './components/MotionStage'
 import { RecordedGraph } from './components/RecordedGraph'
 import { PALETTE } from './data'
+import type { EasingChannel } from './easing'
 import type { MotionObject, MotionSample, ShapeKind } from './types'
 
 const INITIAL_OBJECT: MotionObject = {
@@ -20,6 +21,7 @@ function App() {
   const [object, setObject] = useState(INITIAL_OBJECT)
   const [duration, setDuration] = useState(3)
   const [activeTab, setActiveTab] = useState<'curves' | 'steps'>('curves')
+  const [curveChannel, setCurveChannel] = useState<EasingChannel>('position')
   const [phase, setPhase] = useState<CapturePhase>('idle')
   const [countdown, setCountdown] = useState<number | null>(null)
   const [progress, setProgress] = useState(0)
@@ -114,6 +116,10 @@ function App() {
   const keyframes = samples.length
     ? [0, .25, .5, .75, 1].map((ratio) => samples.reduce((best, sample) => Math.abs(sample.time - capturedDuration * ratio) < Math.abs(best.time - capturedDuration * ratio) ? sample : best, samples[0]))
     : []
+  const curveSegments = keyframes.slice(0, -1).map((start, index) => {
+    const end = keyframes[index + 1]
+    return samples.filter(sample => sample.time >= start.time && sample.time <= end.time)
+  })
 
   const copyMotionData = async () => {
     const value = keyframes.map(sample => `${sample.time.toFixed(2)}s — X ${Math.round(sample.x)}, Y ${Math.round(sample.y)}, Rotation ${Math.round(sample.rotation)}°`).join('\n')
@@ -192,8 +198,13 @@ function App() {
               </div>
             ) : activeTab === 'curves' ? (
               <div className="guide-content recording-results">
-                <div className="generated-title"><div><p className="kicker">CAPTURE COMPLETE</p><h2>Movement mapped</h2><p>{samples.length} samples across {capturedDuration.toFixed(1)} seconds.</p></div><WandSparkles size={22} /></div>
-                <div className="recorded-graphs"><RecordedGraph label="X position" unit="px" color="#a7f7d2" samples={samples} value={sample => sample.x} /><RecordedGraph label="Y position" unit="px" color="#86b7ff" samples={samples} value={sample => sample.y} /><RecordedGraph label="Rotation" unit="°" color="#b7a5ff" samples={samples} value={sample => sample.rotation} /></div>
+                <div className="generated-title"><div><p className="kicker">CAPTURE COMPLETE</p><h2>Alight easing curves</h2><p>One curve for each pair of keyframes.</p></div><WandSparkles size={22} /></div>
+                <div className="curve-channel-switch" aria-label="Curve property">
+                  <button className={curveChannel === 'position' ? 'active' : ''} onClick={() => setCurveChannel('position')}><MousePointer2 size={14} /> Position</button>
+                  <button className={curveChannel === 'rotation' ? 'active' : ''} onClick={() => setCurveChannel('rotation')}><RotateCw size={14} /> Rotation</button>
+                </div>
+                <div className="curve-explainer"><span>X</span><p><strong>Time → remapped progress</strong>The dotted line is your captured timing; the solid curve is the fitted Alight Motion curve.</p></div>
+                <div className="recorded-graphs">{curveSegments.map((segment, index) => <RecordedGraph key={`${curveChannel}-${index}`} label={`Keyframe ${index + 1} → ${index + 2}`} samples={segment} channel={curveChannel} />)}</div>
                 <div className="sample-summary"><div><span>DURATION</span><strong>{capturedDuration.toFixed(1)}s</strong></div><div><span>SAMPLES</span><strong>{samples.length}</strong></div><div><span>KEYFRAMES</span><strong>{keyframes.length}</strong></div></div>
                 <button className="generate-button" onClick={() => setActiveTab('steps')}><Sparkles size={17} /> View Alight Motion steps</button>
               </div>
@@ -204,7 +215,7 @@ function App() {
                   <div className="instruction"><span>00</span><div><h3>Create three property tracks</h3><p>On your layer, enable keyframes for Position X, Position Y, and Rotation.</p></div></div>
                   {keyframes.map((sample, index) => <div className="instruction" key={`${sample.time}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><div><h3>At {sample.time.toFixed(2)} seconds</h3><p>Set X to {Math.round(sample.x)} px, Y to {Math.round(sample.y)} px, and Rotation to {Math.round(sample.rotation)}°.</p></div></div>)}
                 </div>
-                <div className="tip-card"><Sparkles size={17} /><div><strong>Preserve the performance</strong><p>Use linear interpolation first. Add more sampled keyframes anywhere the graph changes direction sharply.</p></div></div>
+                <div className="tip-card"><Sparkles size={17} /><div><strong>Apply each curve separately</strong><p>Move the playhead between each keyframe pair, open the Curve Editor, then enter the four handle values shown on its graph.</p></div></div>
                 <button className="generate-button" onClick={copyMotionData}><Copy size={17} /> {copied ? 'Copied keyframes' : 'Copy keyframe values'}</button>
               </div>
             )}
