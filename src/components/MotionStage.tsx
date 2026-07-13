@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { LocateFixed, Minus, Plus } from 'lucide-react'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import type { MotionObject } from '../types'
@@ -11,10 +12,17 @@ interface MotionStageProps {
   recording?: boolean
 }
 
+const WORLD_WIDTH = 2000
+const WORLD_HEIGHT = 1400
+const MIN_ZOOM = .35
+const MAX_ZOOM = 3
+
 function useContainerSize(ref: React.RefObject<HTMLDivElement | null>) {
   const [size, setSize] = useState({ width: 760, height: 520 })
   useLayoutEffect(() => {
     if (!ref.current) return
+    const bounds = ref.current.getBoundingClientRect()
+    setSize({ width: bounds.width, height: bounds.height })
     const observer = new ResizeObserver(([entry]) => {
       setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
     })
@@ -42,6 +50,84 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
   const size = useContainerSize(containerRef)
   const image = LoadedImage({ src: object.imageUrl })
   const display = previewPosition ?? object
+  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 })
+  const hasCentered = useRef(false)
+
+  const clampPosition = useCallback((position: { x: number; y: number }) => {
+    const padding = 12
+    return {
+      x: Math.min(Math.max(position.x, padding), WORLD_WIDTH - object.width - padding),
+      y: Math.min(Math.max(position.y, padding), WORLD_HEIGHT - object.height - padding),
+    }
+  }, [object.width, object.height])
+
+  const boundShapeDrag = useCallback((absolutePosition: { x: number; y: number }) => {
+    const parent = shapeRef.current?.getParent()
+    if (!parent) return absolutePosition
+    const parentTransform = parent.getAbsoluteTransform()
+    const localPosition = parentTransform.copy().invert().point(absolutePosition)
+    return parentTransform.point(clampPosition(localPosition))
+  }, [clampPosition])
+
+  const clampViewport = useCallback((next: { x: number; y: number; scale: number }) => {
+    const scaledWidth = WORLD_WIDTH * next.scale
+    const scaledHeight = WORLD_HEIGHT * next.scale
+    const x = scaledWidth <= size.width
+      ? (size.width - scaledWidth) / 2
+      : Math.min(0, Math.max(size.width - scaledWidth, next.x))
+    const y = scaledHeight <= size.height
+      ? (size.height - scaledHeight) / 2
+      : Math.min(0, Math.max(size.height - scaledHeight, next.y))
+    return { ...next, x, y }
+  }, [size.width, size.height])
+
+  const centerOnObject = useCallback(() => {
+    const scale = 1
+    setViewport(clampViewport({
+      scale,
+      x: size.width / 2 - (object.x + object.width / 2) * scale,
+      y: size.height / 2 - (object.y + object.height / 2) * scale,
+    }))
+  }, [clampViewport, object.x, object.y, object.width, object.height, size.width, size.height])
+
+  useEffect(() => {
+    if (!hasCentered.current && size.width > 0 && size.height > 0) {
+      centerOnObject()
+      hasCentered.current = true
+    }
+  }, [centerOnObject, size.width, size.height])
+
+  const zoomAt = (point: { x: number; y: number }, requestedScale: number) => {
+    const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requestedScale))
+    const worldPoint = {
+      x: (point.x - viewport.x) / viewport.scale,
+      y: (point.y - viewport.y) / viewport.scale,
+    }
+    setViewport(clampViewport({
+      scale,
+      x: point.x - worldPoint.x * scale,
+      y: point.y - worldPoint.y * scale,
+    }))
+  }
+
+  const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
+    event.evt.preventDefault()
+    if (event.evt.ctrlKey || event.evt.metaKey) {
+      const pointer = event.target.getStage()?.getPointerPosition()
+      if (!pointer) return
+      zoomAt(pointer, viewport.scale * Math.exp(-event.evt.deltaY * .01))
+      return
+    }
+    setViewport(current => clampViewport({
+      ...current,
+      x: current.x - event.evt.deltaX,
+      y: current.y - event.evt.deltaY,
+    }))
+  }
+
+  const zoomFromCenter = (factor: number) => {
+    zoomAt({ x: size.width / 2, y: size.height / 2 }, viewport.scale * factor)
+  }
 
   useEffect(() => {
     if (shapeRef.current && transformerRef.current) {
@@ -85,62 +171,74 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
 
   return (
     <div className="stage-container" ref={containerRef}>
-      <Stage width={size.width} height={size.height}>
+      <Stage width={size.width} height={size.height} onWheel={handleWheel}>
         <Layer listening={false}>
-          {Array.from({ length: Math.ceil(size.width / 40) }).map((_, index) => (
-            <Line key={`v-${index}`} points={[index * 40, 0, index * 40, size.height]} stroke="#223039" strokeWidth={1} />
-          ))}
-          {Array.from({ length: Math.ceil(size.height / 40) }).map((_, index) => (
-            <Line key={`h-${index}`} points={[0, index * 40, size.width, index * 40]} stroke="#223039" strokeWidth={1} />
-          ))}
-          <Line
-            points={[object.startX + object.width / 2, object.startY + object.height / 2, endX + object.width / 2, endY + object.height / 2]}
-            stroke="#63727a"
-            strokeWidth={1.5}
-            dash={[7, 8]}
-          />
-          <Circle x={object.startX + object.width / 2} y={object.startY + object.height / 2} radius={5} fill="#0f171c" stroke="#93a1a9" />
-          <Circle x={endX + object.width / 2} y={endY + object.height / 2} radius={5} fill="#b8ffd9" stroke="#0f171c" />
-          <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10} fontFamily="DM Sans" />
-          <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10} fontFamily="DM Sans" />
+          <Group x={viewport.x} y={viewport.y} scaleX={viewport.scale} scaleY={viewport.scale}>
+            <Rect width={WORLD_WIDTH} height={WORLD_HEIGHT} fill="#111b20" stroke="#334149" strokeWidth={1 / viewport.scale} />
+            {Array.from({ length: Math.ceil(WORLD_WIDTH / 40) + 1 }).map((_, index) => (
+              <Line key={`v-${index}`} points={[index * 40, 0, index * 40, WORLD_HEIGHT]} stroke="#223039" strokeWidth={1 / viewport.scale} />
+            ))}
+            {Array.from({ length: Math.ceil(WORLD_HEIGHT / 40) + 1 }).map((_, index) => (
+              <Line key={`h-${index}`} points={[0, index * 40, WORLD_WIDTH, index * 40]} stroke="#223039" strokeWidth={1 / viewport.scale} />
+            ))}
+            <Line
+              points={[object.startX + object.width / 2, object.startY + object.height / 2, endX + object.width / 2, endY + object.height / 2]}
+              stroke="#63727a"
+              strokeWidth={1.5 / viewport.scale}
+              dash={[7 / viewport.scale, 8 / viewport.scale]}
+            />
+            <Circle x={object.startX + object.width / 2} y={object.startY + object.height / 2} radius={5 / viewport.scale} fill="#0f171c" stroke="#93a1a9" />
+            <Circle x={endX + object.width / 2} y={endY + object.height / 2} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
+            <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
+            <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
+          </Group>
         </Layer>
         <Layer>
-          <Group
-            ref={shapeRef}
-            x={display.x}
-            y={display.y}
-            rotation={display.rotation}
-            draggable={!previewPosition}
-            onDragMove={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
-            onDragEnd={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
-            onTransform={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y(), rotation: event.target.rotation() })}
-            onTransformEnd={commitTransform}
-          >
-            <Rect width={object.width} height={object.height} fill="#000" opacity={0.18} cornerRadius={24} x={8} y={10} listening={false} />
-            {renderShape()}
+          <Group x={viewport.x} y={viewport.y} scaleX={viewport.scale} scaleY={viewport.scale}>
+            <Group
+              ref={shapeRef}
+              x={display.x}
+              y={display.y}
+              rotation={display.rotation}
+              draggable={!previewPosition}
+              dragBoundFunc={boundShapeDrag}
+              onDragMove={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
+              onDragEnd={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
+              onTransform={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y(), rotation: event.target.rotation() })}
+              onTransformEnd={commitTransform}
+            >
+              <Rect width={object.width} height={object.height} fill="#000" opacity={0.18} cornerRadius={24} x={8} y={10} listening={false} />
+              {renderShape()}
+            </Group>
+            {!previewPosition && (
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled
+                borderStroke="#b8ffd9"
+                borderStrokeWidth={1.5 / viewport.scale}
+                anchorFill="#b8ffd9"
+                anchorStroke="#10191e"
+                anchorSize={10 / viewport.scale}
+                anchorCornerRadius={5 / viewport.scale}
+                rotateAnchorOffset={28 / viewport.scale}
+                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+                boundBoxFunc={(oldBox, newBox) => newBox.width < 48 || newBox.height < 48 ? oldBox : newBox}
+              />
+            )}
           </Group>
-          {!previewPosition && (
-            <Transformer
-              ref={transformerRef}
-              rotateEnabled
-              borderStroke="#b8ffd9"
-              borderStrokeWidth={1.5}
-              anchorFill="#b8ffd9"
-              anchorStroke="#10191e"
-              anchorSize={10}
-              anchorCornerRadius={5}
-              rotateAnchorOffset={28}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
-              boundBoxFunc={(oldBox, newBox) => newBox.width < 48 || newBox.height < 48 ? oldBox : newBox}
-            />
-          )}
         </Layer>
       </Stage>
       {countdown !== null && countdown !== undefined && (
         <div className="countdown-overlay"><span>GET READY</span><strong key={countdown}>{countdown}</strong><small>Grab the object when recording starts</small></div>
       )}
       {recording && <div className="recording-indicator"><i /> RECORDING MOVEMENT</div>}
-      <div className="stage-hint">Drag to position · Handles resize · Top handle rotates</div>
+      <div className="viewport-controls" aria-label="Canvas zoom controls">
+        <button onClick={() => zoomFromCenter(.8)} title="Zoom out"><Minus size={13} /></button>
+        <span>{Math.round(viewport.scale * 100)}%</span>
+        <button onClick={() => zoomFromCenter(1.25)} title="Zoom in"><Plus size={13} /></button>
+        <button onClick={centerOnObject} title="Center object"><LocateFixed size={13} /></button>
+      </div>
+      <div className="stage-hint">Two-finger scroll to pan · Pinch to zoom · Drag object to move</div>
     </div>
   )
 }
