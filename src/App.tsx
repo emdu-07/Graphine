@@ -26,6 +26,7 @@ function App() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [progress, setProgress] = useState(0)
   const [samples, setSamples] = useState<MotionSample[]>([])
+  const [trailSamples, setTrailSamples] = useState<MotionSample[]>([])
   const [showShapes, setShowShapes] = useState(false)
   const [copied, setCopied] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -62,6 +63,7 @@ function App() {
       if (elapsed * 1000 - lastSampleAt >= 32 || elapsed >= duration) {
         const current = objectRef.current
         sampleBuffer.current.push({ time: elapsed, x: current.x, y: current.y, rotation: current.rotation })
+        setTrailSamples([...sampleBuffer.current])
         lastSampleAt = elapsed * 1000
       }
       if (elapsed < duration) frame = requestAnimationFrame(capture)
@@ -80,6 +82,7 @@ function App() {
     const current = objectRef.current
     updateObject({ ...current, startX: current.x, startY: current.y })
     setSamples([])
+    setTrailSamples([])
     sampleBuffer.current = []
     setProgress(0)
     setCountdown(3)
@@ -97,6 +100,7 @@ function App() {
     updateObject({ ...INITIAL_OBJECT, id: crypto.randomUUID(), kind, name: `${kind[0].toUpperCase()}${kind.slice(1)} layer`, fill: kind === 'circle' ? PALETTE[2] : kind === 'triangle' ? PALETTE[1] : PALETTE[0] })
     setShowShapes(false)
     setSamples([])
+    setTrailSamples([])
     setPhase('idle')
     setProgress(0)
   }
@@ -107,6 +111,7 @@ function App() {
     reader.onload = () => {
       updateObject({ ...INITIAL_OBJECT, id: crypto.randomUUID(), kind: 'image', name: file.name, imageUrl: String(reader.result), width: 180, height: 135 })
       setSamples([])
+      setTrailSamples([])
       setPhase('idle')
     }
     reader.readAsDataURL(file)
@@ -168,7 +173,7 @@ function App() {
                 <div className="object-identity"><Box size={15} /><span>{object.name}</span></div>
                 <div className="stage-stats"><span>X {Math.round(object.x)}</span><span>Y {Math.round(object.y)}</span><span>{Math.round(object.rotation)}°</span></div>
               </div>
-              <MotionStage object={object} onChange={updateObject} countdown={countdown} recording={phase === 'recording'} />
+              <MotionStage object={object} onChange={updateObject} countdown={countdown} recording={phase === 'recording'} motionPath={trailSamples} />
               <div className="playback-bar capture-bar">
                 <button className={`play-button ${phase === 'recording' ? 'stop' : ''}`} onClick={phase === 'recording' ? stopCapture : startCapture} disabled={phase === 'countdown'}>{phase === 'recording' ? <StopCircle size={17} /> : <Play size={17} fill="currentColor" />}</button>
                 <span className="timecode">{elapsed.toFixed(1)}s</span>

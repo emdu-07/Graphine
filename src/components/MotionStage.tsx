@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { LocateFixed, Minus, Plus } from 'lucide-react'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
 import type Konva from 'konva'
-import type { MotionObject } from '../types'
+import type { MotionObject, MotionSample } from '../types'
 
 interface MotionStageProps {
   object: MotionObject
@@ -10,6 +10,7 @@ interface MotionStageProps {
   previewPosition?: { x: number; y: number; rotation: number }
   countdown?: number | null
   recording?: boolean
+  motionPath?: MotionSample[]
 }
 
 const WORLD_WIDTH = 2000
@@ -43,7 +44,7 @@ function LoadedImage({ src }: { src?: string }) {
   return image
 }
 
-export function MotionStage({ object, onChange, previewPosition, countdown, recording }: MotionStageProps) {
+export function MotionStage({ object, onChange, previewPosition, countdown, recording, motionPath = [] }: MotionStageProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const shapeRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -168,6 +169,23 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
 
   const endX = object.x
   const endY = object.y
+  const centerAt = (x: number, y: number, rotation: number) => {
+    const radians = rotation * Math.PI / 180
+    const halfWidth = object.width / 2
+    const halfHeight = object.height / 2
+    return {
+      x: x + halfWidth * Math.cos(radians) - halfHeight * Math.sin(radians),
+      y: y + halfWidth * Math.sin(radians) + halfHeight * Math.cos(radians),
+    }
+  }
+  const startCenter = centerAt(object.startX, object.startY, motionPath[0]?.rotation ?? object.rotation)
+  const endCenter = centerAt(endX, endY, object.rotation)
+  const trailPoints = motionPath.length > 1
+    ? motionPath.flatMap(sample => {
+        const center = centerAt(sample.x, sample.y, sample.rotation)
+        return [center.x, center.y]
+      })
+    : [startCenter.x, startCenter.y, endCenter.x, endCenter.y]
 
   return (
     <div className="stage-container" ref={containerRef}>
@@ -182,13 +200,16 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
               <Line key={`h-${index}`} points={[0, index * 40, WORLD_WIDTH, index * 40]} stroke="#223039" strokeWidth={1 / viewport.scale} />
             ))}
             <Line
-              points={[object.startX + object.width / 2, object.startY + object.height / 2, endX + object.width / 2, endY + object.height / 2]}
+              points={trailPoints}
               stroke="#63727a"
               strokeWidth={1.5 / viewport.scale}
               dash={[7 / viewport.scale, 8 / viewport.scale]}
+              tension={motionPath.length > 2 ? .18 : 0}
+              lineCap="round"
+              lineJoin="round"
             />
-            <Circle x={object.startX + object.width / 2} y={object.startY + object.height / 2} radius={5 / viewport.scale} fill="#0f171c" stroke="#93a1a9" />
-            <Circle x={endX + object.width / 2} y={endY + object.height / 2} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
+            <Circle x={startCenter.x} y={startCenter.y} radius={5 / viewport.scale} fill="#0f171c" stroke="#93a1a9" />
+            <Circle x={endCenter.x} y={endCenter.y} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
             <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
             <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
           </Group>
