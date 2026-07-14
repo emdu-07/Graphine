@@ -52,7 +52,18 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
   const image = LoadedImage({ src: object.imageUrl })
   const display = previewPosition ?? object
   const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 })
+  const [activeSnap, setActiveSnap] = useState<'horizontal' | 'vertical' | null>(null)
   const hasCentered = useRef(false)
+  const dragMotion = useRef<{
+    originX: number
+    originY: number
+    filteredX: number
+    filteredY: number
+    rawX: number
+    rawY: number
+    snap: 'horizontal' | 'vertical' | null
+  } | null>(null)
+  const filteredRotation = useRef<number | null>(null)
 
   const clampPosition = useCallback((position: { x: number; y: number }) => {
     const padding = 12
@@ -154,6 +165,63 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     })
   }
 
+  const beginDrag = (event: Konva.KonvaEventObject<DragEvent>) => {
+    const x = event.target.x()
+    const y = event.target.y()
+    dragMotion.current = { originX: x, originY: y, filteredX: x, filteredY: y, rawX: x, rawY: y, snap: null }
+    setActiveSnap(null)
+  }
+
+  const stabilizeDrag = (event: Konva.KonvaEventObject<DragEvent>) => {
+    const state = dragMotion.current
+    if (!state) return
+    const rawX = event.target.x()
+    const rawY = event.target.y()
+    const deltaX = rawX - state.originX
+    const deltaY = rawY - state.originY
+    const absX = Math.abs(deltaX)
+    const absY = Math.abs(deltaY)
+    let snap = state.snap
+
+    if (snap === 'horizontal' && absY > Math.max(24, absX * .22)) snap = null
+    if (snap === 'vertical' && absX > Math.max(24, absY * .22)) snap = null
+    if (!snap && Math.max(absX, absY) > 28) {
+      if (absY <= Math.max(7, absX * .11)) snap = 'horizontal'
+      else if (absX <= Math.max(7, absY * .11)) snap = 'vertical'
+    }
+
+    const targetX = snap === 'vertical' ? state.originX : rawX
+    const targetY = snap === 'horizontal' ? state.originY : rawY
+    const smoothing = .38
+    const filteredX = snap === 'vertical' ? state.originX : state.filteredX + (targetX - state.filteredX) * smoothing
+    const filteredY = snap === 'horizontal' ? state.originY : state.filteredY + (targetY - state.filteredY) * smoothing
+
+    event.target.position({ x: filteredX, y: filteredY })
+    dragMotion.current = { ...state, filteredX, filteredY, rawX, rawY, snap }
+    if (snap !== state.snap) setActiveSnap(snap)
+    onChange({ ...object, x: filteredX, y: filteredY })
+  }
+
+  const finishDrag = (event: Konva.KonvaEventObject<DragEvent>) => {
+    onChange({ ...object, x: event.target.x(), y: event.target.y() })
+    dragMotion.current = null
+    setActiveSnap(null)
+  }
+
+  const beginRotation = (event: Konva.KonvaEventObject<Event>) => {
+    filteredRotation.current = event.target.rotation()
+  }
+
+  const stabilizeTransform = (event: Konva.KonvaEventObject<Event>) => {
+    const rawRotation = event.target.rotation()
+    const previous = filteredRotation.current ?? rawRotation
+    const shortestDelta = ((rawRotation - previous + 540) % 360) - 180
+    const rotation = previous + shortestDelta * .42
+    filteredRotation.current = rotation
+    event.target.rotation(rotation)
+    onChange({ ...object, x: event.target.x(), y: event.target.y(), rotation })
+  }
+
   const renderShape = () => {
     if (object.kind === 'image' && image) {
       return <KonvaImage image={image} width={object.width} height={object.height} cornerRadius={18} />
@@ -199,6 +267,8 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
             {Array.from({ length: Math.ceil(WORLD_HEIGHT / 40) + 1 }).map((_, index) => (
               <Line key={`h-${index}`} points={[0, index * 40, WORLD_WIDTH, index * 40]} stroke="#223039" strokeWidth={1 / viewport.scale} />
             ))}
+            {activeSnap === 'horizontal' && <Line points={[0, dragMotion.current?.originY ?? object.y, WORLD_WIDTH, dragMotion.current?.originY ?? object.y]} stroke="#b8ffd9" opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
+            {activeSnap === 'vertical' && <Line points={[dragMotion.current?.originX ?? object.x, 0, dragMotion.current?.originX ?? object.x, WORLD_HEIGHT]} stroke="#b8ffd9" opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
             <Line
               points={trailPoints}
               stroke="#63727a"
@@ -223,10 +293,12 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
               rotation={display.rotation}
               draggable={!previewPosition}
               dragBoundFunc={boundShapeDrag}
-              onDragMove={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
-              onDragEnd={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y() })}
-              onTransform={(event) => onChange({ ...object, x: event.target.x(), y: event.target.y(), rotation: event.target.rotation() })}
-              onTransformEnd={commitTransform}
+              onDragStart={beginDrag}
+              onDragMove={stabilizeDrag}
+              onDragEnd={finishDrag}
+              onTransformStart={beginRotation}
+              onTransform={stabilizeTransform}
+              onTransformEnd={() => { filteredRotation.current = null; commitTransform() }}
             >
               <Rect width={object.width} height={object.height} fill="#000" opacity={0.18} cornerRadius={24} x={8} y={10} listening={false} />
               {renderShape()}
