@@ -183,18 +183,19 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     const absY = Math.abs(deltaY)
     let snap = state.snap
 
-    if (snap === 'horizontal' && absY > Math.max(24, absX * .22)) snap = null
-    if (snap === 'vertical' && absX > Math.max(24, absY * .22)) snap = null
-    if (!snap && Math.max(absX, absY) > 28) {
-      if (absY <= Math.max(7, absX * .11)) snap = 'horizontal'
-      else if (absX <= Math.max(7, absY * .11)) snap = 'vertical'
+    if (snap === 'horizontal' && absY > Math.max(10, absX * .09)) snap = null
+    if (snap === 'vertical' && absX > Math.max(10, absY * .09)) snap = null
+    if (!snap && Math.max(absX, absY) > 36) {
+      if (absY <= Math.max(4, absX * .05)) snap = 'horizontal'
+      else if (absX <= Math.max(4, absY * .05)) snap = 'vertical'
     }
 
-    const targetX = snap === 'vertical' ? state.originX : rawX
-    const targetY = snap === 'horizontal' ? state.originY : rawY
+    const magneticStrength = .14
+    const targetX = snap === 'vertical' ? state.originX + deltaX * magneticStrength : rawX
+    const targetY = snap === 'horizontal' ? state.originY + deltaY * magneticStrength : rawY
     const smoothing = .38
-    const filteredX = snap === 'vertical' ? state.originX : state.filteredX + (targetX - state.filteredX) * smoothing
-    const filteredY = snap === 'horizontal' ? state.originY : state.filteredY + (targetY - state.filteredY) * smoothing
+    const filteredX = state.filteredX + (targetX - state.filteredX) * smoothing
+    const filteredY = state.filteredY + (targetY - state.filteredY) * smoothing
 
     event.target.position({ x: filteredX, y: filteredY })
     dragMotion.current = { ...state, filteredX, filteredY, rawX, rawY, snap }
