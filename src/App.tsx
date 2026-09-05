@@ -1,27 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Aperture, Box, ChevronDown, Circle as CircleIcon, Copy, Download, Grid2X2, HelpCircle,
-  ImagePlus, Layers3, MousePointer2, Play, Plus, RotateCw, Share2, Sparkles, Square,
-  StopCircle, Triangle, Undo2, Upload, WandSparkles,
+  ImagePlus, Layers3, Moon, MousePointer2, Play, Plus, RotateCw, ScanSearch, Share2,
+  Sparkles, Square, StopCircle, Sun, Triangle, Undo2, Upload, WandSparkles,
 } from 'lucide-react'
 import { MotionStage } from './components/MotionStage'
 import { RecordedGraph } from './components/RecordedGraph'
 import { PALETTE } from './data'
-import type { EasingChannel } from './easing'
-import type { MotionObject, MotionSample, ShapeKind } from './types'
+import { buildMotionResult } from './motion/engine'
+import type { CapturePhase, MotionChannel, MotionSample } from './motion/types'
+import type { MotionObject, ShapeKind } from './types'
 
 const INITIAL_OBJECT: MotionObject = {
   id: 'object-1', name: 'Lavender shape', kind: 'square', x: 300, y: 210,
   startX: 300, startY: 210, width: 126, height: 126, rotation: 0, fill: PALETTE[0],
 }
 
-type CapturePhase = 'idle' | 'countdown' | 'recording' | 'complete'
-
 function App() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const savedTheme = window.localStorage.getItem('graphine-theme')
+    if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  })
   const [object, setObject] = useState(INITIAL_OBJECT)
   const [duration, setDuration] = useState(3)
   const [activeTab, setActiveTab] = useState<'curves' | 'steps'>('curves')
-  const [curveChannel, setCurveChannel] = useState<EasingChannel>('position')
+  const [curveChannel, setCurveChannel] = useState<MotionChannel>('position')
   const [phase, setPhase] = useState<CapturePhase>('idle')
   const [countdown, setCountdown] = useState<number | null>(null)
   const [progress, setProgress] = useState(0)
@@ -32,6 +36,11 @@ function App() {
   const fileInput = useRef<HTMLInputElement>(null)
   const objectRef = useRef(object)
   const sampleBuffer = useRef<MotionSample[]>([])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem('graphine-theme', theme)
+  }, [theme])
 
   const updateObject = (next: MotionObject) => {
     objectRef.current = next
@@ -117,17 +126,17 @@ function App() {
     reader.readAsDataURL(file)
   }
 
-  const capturedDuration = samples.at(-1)?.time ?? duration
-  const keyframes = samples.length
-    ? [0, .25, .5, .75, 1].map((ratio) => samples.reduce((best, sample) => Math.abs(sample.time - capturedDuration * ratio) < Math.abs(best.time - capturedDuration * ratio) ? sample : best, samples[0]))
-    : []
-  const curveSegments = keyframes.slice(0, -1).map((start, index) => {
-    const end = keyframes[index + 1]
-    return samples.filter(sample => sample.time >= start.time && sample.time <= end.time)
-  })
+  const motionResult = buildMotionResult(samples)
+  const curves = motionResult.curves.filter(curve => curve.channel === curveChannel)
 
   const copyMotionData = async () => {
-    const value = keyframes.map(sample => `${sample.time.toFixed(2)}s — X ${Math.round(sample.x)}, Y ${Math.round(sample.y)}, Rotation ${Math.round(sample.rotation)}°`).join('\n')
+    const positionValues = motionResult.keyframes.position.map(sample => `${sample.time.toFixed(2)}s — X ${Math.round(sample.x)}, Y ${Math.round(sample.y)}`)
+    const rotationValues = motionResult.keyframes.rotation.map(sample => `${sample.time.toFixed(2)}s — Rotation ${Math.round(sample.rotation)}°`)
+    const value = [
+      ...(positionValues.length ? ['POSITION', ...positionValues] : []),
+      ...(positionValues.length && rotationValues.length ? [''] : []),
+      ...(rotationValues.length ? ['ROTATION', ...rotationValues] : []),
+    ].join('\n')
     await navigator.clipboard.writeText(value)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1600)
@@ -141,11 +150,18 @@ function App() {
       <aside className="sidebar">
         <div className="brand-mark"><Aperture size={25} /><span>graphine</span></div>
         <nav className="side-nav" aria-label="Main navigation">
-          <button className="nav-button active" aria-label="Motion workspace"><MousePointer2 size={19} /></button>
-          <button className="nav-button" aria-label="Layers"><Layers3 size={19} /></button>
-          <button className="nav-button" aria-label="Projects"><Grid2X2 size={19} /></button>
+          <button className="nav-button active" aria-label="Motion workspace"><MousePointer2 size={19} /><span className="nav-label">Motion</span></button>
+          <button className="nav-button future" aria-label="Analyze Reference, coming soon" aria-disabled="true"><ScanSearch size={19} /><span className="nav-label">Analyze Reference</span><small>SOON</small></button>
+          <button className="nav-button" aria-label="Layers"><Layers3 size={19} /><span className="nav-label">Layers</span></button>
+          <button className="nav-button" aria-label="Projects"><Grid2X2 size={19} /><span className="nav-label">Projects</span></button>
         </nav>
-        <div className="sidebar-bottom"><button className="nav-button"><HelpCircle size={19} /></button><button className="avatar">EM</button></div>
+        <div className="sidebar-bottom">
+          <button className="nav-button theme-toggle" onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}<span className="nav-label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+          <button className="nav-button"><HelpCircle size={19} /><span className="nav-label">Help</span></button>
+          <button className="account-button"><span className="avatar">EM</span><span className="nav-label">Account</span></button>
+        </div>
       </aside>
 
       <main className="workspace">
@@ -209,16 +225,15 @@ function App() {
                   <button className={curveChannel === 'rotation' ? 'active' : ''} onClick={() => setCurveChannel('rotation')}><RotateCw size={14} /> Rotation</button>
                 </div>
                 <div className="curve-explainer"><span>X</span><p><strong>Time → remapped progress</strong>The dotted line is your captured timing; the solid curve is the fitted Alight Motion curve.</p></div>
-                <div className="recorded-graphs">{curveSegments.map((segment, index) => <RecordedGraph key={`${curveChannel}-${index}`} label={`Keyframe ${index + 1} → ${index + 2}`} samples={segment} channel={curveChannel} />)}</div>
-                <div className="sample-summary"><div><span>DURATION</span><strong>{capturedDuration.toFixed(1)}s</strong></div><div><span>SAMPLES</span><strong>{samples.length}</strong></div><div><span>KEYFRAMES</span><strong>{keyframes.length}</strong></div></div>
+                <div className="recorded-graphs">{curves.map(curve => <RecordedGraph key={`${curve.channel}-${curve.segmentIndex}`} curve={curve} />)}</div>
+                <div className="sample-summary"><div><span>DURATION</span><strong>{motionResult.duration.toFixed(1)}s</strong></div><div><span>KEYFRAMES</span><strong>{motionResult.keyframes.position.length} position keyframes<br />{motionResult.keyframes.rotation.length} rotation keyframes</strong></div></div>
                 <button className="generate-button" onClick={() => setActiveTab('steps')}><Sparkles size={17} /> View Alight Motion steps</button>
               </div>
             ) : (
               <div className="guide-content steps-content">
                 <div className="generated-title"><div><p className="kicker">ALIGHT MOTION</p><h2>Rebuild this motion</h2><p>Use these sampled keyframes as your guide.</p></div><Upload size={22} /></div>
                 <div className="steps-list">
-                  <div className="instruction"><span>00</span><div><h3>Create three property tracks</h3><p>On your layer, enable keyframes for Position X, Position Y, and Rotation.</p></div></div>
-                  {keyframes.map((sample, index) => <div className="instruction" key={`${sample.time}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><div><h3>At {sample.time.toFixed(2)} seconds</h3><p>Set X to {Math.round(sample.x)} px, Y to {Math.round(sample.y)} px, and Rotation to {Math.round(sample.rotation)}°.</p></div></div>)}
+                  {motionResult.steps.map(step => <div className="instruction" key={step.id}><span>{String(step.index).padStart(2, '0')}</span><div><h3>{step.title}</h3><p>{step.description}</p></div></div>)}
                 </div>
                 <div className="tip-card"><Sparkles size={17} /><div><strong>Apply each curve separately</strong><p>Move the playhead between each keyframe pair, open the Curve Editor, then enter the four handle values shown on its graph.</p></div></div>
                 <button className="generate-button" onClick={copyMotionData}><Copy size={17} /> {copied ? 'Copied keyframes' : 'Copy keyframe values'}</button>

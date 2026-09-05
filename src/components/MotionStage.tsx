@@ -78,8 +78,33 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     if (!parent) return absolutePosition
     const parentTransform = parent.getAbsoluteTransform()
     const localPosition = parentTransform.copy().invert().point(absolutePosition)
-    return parentTransform.point(clampPosition(localPosition))
-  }, [clampPosition])
+    const clampedPosition = clampPosition({
+      x: localPosition.x - object.width / 2,
+      y: localPosition.y - object.height / 2,
+    })
+    return parentTransform.point({
+      x: clampedPosition.x + object.width / 2,
+      y: clampedPosition.y + object.height / 2,
+    })
+  }, [clampPosition, object.height, object.width])
+
+  const keepShapeInsideWorld = (node: Konva.Group) => {
+    const parent = node.getParent()
+    if (!parent) return { x: node.x(), y: node.y() }
+
+    const padding = 12
+    const bounds = node.getClientRect({ relativeTo: parent, skipShadow: true })
+    let x = node.x()
+    let y = node.y()
+
+    if (bounds.x < padding) x += padding - bounds.x
+    else if (bounds.x + bounds.width > WORLD_WIDTH - padding) x -= bounds.x + bounds.width - (WORLD_WIDTH - padding)
+    if (bounds.y < padding) y += padding - bounds.y
+    else if (bounds.y + bounds.height > WORLD_HEIGHT - padding) y -= bounds.y + bounds.height - (WORLD_HEIGHT - padding)
+
+    node.position({ x, y })
+    return { x, y }
+  }
 
   const clampViewport = useCallback((next: { x: number; y: number; scale: number }) => {
     const scaledWidth = WORLD_WIDTH * next.scale
@@ -153,14 +178,16 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     if (!node) return
     const scaleX = node.scaleX()
     const scaleY = node.scaleY()
+    const width = Math.max(48, object.width * scaleX)
+    const height = Math.max(48, object.height * scaleY)
     node.scaleX(1)
     node.scaleY(1)
     onChange({
       ...object,
-      x: node.x(),
-      y: node.y(),
-      width: Math.max(48, object.width * scaleX),
-      height: Math.max(48, object.height * scaleY),
+      x: node.x() - width / 2,
+      y: node.y() - height / 2,
+      width,
+      height,
       rotation: node.rotation(),
     })
   }
@@ -183,28 +210,28 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     const absY = Math.abs(deltaY)
     let snap = state.snap
 
-    if (snap === 'horizontal' && absY > Math.max(10, absX * .09)) snap = null
-    if (snap === 'vertical' && absX > Math.max(10, absY * .09)) snap = null
+    if (snap === 'horizontal' && absY > Math.max(16, absX * .14)) snap = null
+    if (snap === 'vertical' && absX > Math.max(16, absY * .14)) snap = null
     if (!snap && Math.max(absX, absY) > 36) {
-      if (absY <= Math.max(4, absX * .05)) snap = 'horizontal'
-      else if (absX <= Math.max(4, absY * .05)) snap = 'vertical'
+      if (absY <= Math.max(7, absX * .08)) snap = 'horizontal'
+      else if (absX <= Math.max(7, absY * .08)) snap = 'vertical'
     }
 
-    const magneticStrength = .14
+    const magneticStrength = .06
     const targetX = snap === 'vertical' ? state.originX + deltaX * magneticStrength : rawX
     const targetY = snap === 'horizontal' ? state.originY + deltaY * magneticStrength : rawY
-    const smoothing = .38
+    const smoothing = .24
     const filteredX = state.filteredX + (targetX - state.filteredX) * smoothing
     const filteredY = state.filteredY + (targetY - state.filteredY) * smoothing
 
     event.target.position({ x: filteredX, y: filteredY })
     dragMotion.current = { ...state, filteredX, filteredY, rawX, rawY, snap }
     if (snap !== state.snap) setActiveSnap(snap)
-    onChange({ ...object, x: filteredX, y: filteredY })
+    onChange({ ...object, x: filteredX - object.width / 2, y: filteredY - object.height / 2 })
   }
 
   const finishDrag = (event: Konva.KonvaEventObject<DragEvent>) => {
-    onChange({ ...object, x: event.target.x(), y: event.target.y() })
+    onChange({ ...object, x: event.target.x() - object.width / 2, y: event.target.y() - object.height / 2 })
     dragMotion.current = null
     setActiveSnap(null)
   }
@@ -220,7 +247,13 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     const rotation = previous + shortestDelta * .42
     filteredRotation.current = rotation
     event.target.rotation(rotation)
-    onChange({ ...object, x: event.target.x(), y: event.target.y(), rotation })
+    const position = keepShapeInsideWorld(event.target as Konva.Group)
+    onChange({
+      ...object,
+      x: position.x - object.width / 2,
+      y: position.y - object.height / 2,
+      rotation,
+    })
   }
 
   const renderShape = () => {
@@ -238,20 +271,15 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
 
   const endX = object.x
   const endY = object.y
-  const centerAt = (x: number, y: number, rotation: number) => {
-    const radians = rotation * Math.PI / 180
-    const halfWidth = object.width / 2
-    const halfHeight = object.height / 2
-    return {
-      x: x + halfWidth * Math.cos(radians) - halfHeight * Math.sin(radians),
-      y: y + halfWidth * Math.sin(radians) + halfHeight * Math.cos(radians),
-    }
-  }
-  const startCenter = centerAt(object.startX, object.startY, motionPath[0]?.rotation ?? object.rotation)
-  const endCenter = centerAt(endX, endY, object.rotation)
+  const centerAt = (x: number, y: number) => ({
+    x: x + object.width / 2,
+    y: y + object.height / 2,
+  })
+  const startCenter = centerAt(object.startX, object.startY)
+  const endCenter = centerAt(endX, endY)
   const trailPoints = motionPath.length > 1
     ? motionPath.flatMap(sample => {
-        const center = centerAt(sample.x, sample.y, sample.rotation)
+        const center = centerAt(sample.x, sample.y)
         return [center.x, center.y]
       })
     : [startCenter.x, startCenter.y, endCenter.x, endCenter.y]
@@ -289,8 +317,10 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
           <Group x={viewport.x} y={viewport.y} scaleX={viewport.scale} scaleY={viewport.scale}>
             <Group
               ref={shapeRef}
-              x={display.x}
-              y={display.y}
+              x={display.x + object.width / 2}
+              y={display.y + object.height / 2}
+              offsetX={object.width / 2}
+              offsetY={object.height / 2}
               rotation={display.rotation}
               draggable={!previewPosition}
               dragBoundFunc={boundShapeDrag}
@@ -316,7 +346,14 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
                 anchorCornerRadius={5 / viewport.scale}
                 rotateAnchorOffset={28 / viewport.scale}
                 enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
-                boundBoxFunc={(oldBox, newBox) => newBox.width < 48 || newBox.height < 48 ? oldBox : newBox}
+                boundBoxFunc={(oldBox, newBox) => (
+                  newBox.width < 48
+                  || newBox.height < 48
+                  || newBox.width > WORLD_WIDTH - 24
+                  || newBox.height > WORLD_HEIGHT - 24
+                    ? oldBox
+                    : newBox
+                )}
               />
             )}
           </Group>

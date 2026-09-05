@@ -1,14 +1,12 @@
-import type { MotionSample } from './types'
-
-export type EasingChannel = 'position' | 'rotation'
+import type { MotionChannel, MotionCurvePoint, MotionSample } from './motion/types'
 
 export interface DerivedEasing {
-  points: Array<{ time: number; progress: number }>
+  points: MotionCurvePoint[]
   cubic: [number, number, number, number]
   amount: number
 }
 
-export function deriveEasing(samples: MotionSample[], channel: EasingChannel): DerivedEasing {
+export function deriveEasing(samples: MotionSample[], channel: MotionChannel): DerivedEasing {
   if (samples.length < 2) {
     return { points: [{ time: 0, progress: 0 }, { time: 1, progress: 1 }], cubic: [.33, .33, .67, .67], amount: 0 }
   }

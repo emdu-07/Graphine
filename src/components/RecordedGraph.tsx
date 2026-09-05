@@ -1,28 +1,24 @@
 import { Copy } from 'lucide-react'
 import { useState } from 'react'
-import { deriveEasing, type EasingChannel } from '../easing'
-import type { MotionSample } from '../types'
+import type { MotionCurve } from '../motion/types'
 
 interface RecordedGraphProps {
-  label: string
-  samples: MotionSample[]
-  channel: EasingChannel
+  curve: MotionCurve
 }
 
 const GRAPH = { left: 28, right: 284, top: 18, bottom: 146 }
 
-export function RecordedGraph({ label, samples, channel }: RecordedGraphProps) {
+export function RecordedGraph({ curve }: RecordedGraphProps) {
   const [copied, setCopied] = useState(false)
-  const easing = deriveEasing(samples, channel)
-  const [x1, y1, x2, y2] = easing.cubic
+  const [x1, y1, x2, y2] = curve.cubic
   const width = GRAPH.right - GRAPH.left
   const height = GRAPH.bottom - GRAPH.top
   const mapX = (value: number) => GRAPH.left + value * width
   const mapY = (value: number) => GRAPH.bottom - value * height
-  const trace = easing.points.map(point => `${mapX(point.time).toFixed(1)},${mapY(point.progress).toFixed(1)}`).join(' ')
+  const trace = curve.points.map(point => `${mapX(point.time).toFixed(1)},${mapY(point.progress).toFixed(1)}`).join(' ')
   const path = `M ${GRAPH.left} ${GRAPH.bottom} C ${mapX(x1)} ${mapY(y1)}, ${mapX(x2)} ${mapY(y2)}, ${GRAPH.right} ${GRAPH.top}`
-  const color = channel === 'position' ? '#a7f7d2' : '#b7a5ff'
-  const values = easing.cubic.map(value => value.toFixed(2)).join(', ')
+  const color = curve.channel === 'position' ? '#a7f7d2' : '#b7a5ff'
+  const values = curve.cubic.map(value => value.toFixed(2)).join(', ')
 
   const copyCurve = async () => {
     await navigator.clipboard.writeText(values)
@@ -33,10 +29,10 @@ export function RecordedGraph({ label, samples, channel }: RecordedGraphProps) {
   return (
     <div className="easing-card">
       <div className="easing-card-head">
-        <div><span className="graph-color" style={{ background: color }} /> <strong>{label}</strong></div>
-        <span>{easing.amount < .5 ? 'No change' : `${Math.round(easing.amount)} ${channel === 'position' ? 'px travelled' : '° turned'}`}</span>
+        <div><span className="graph-color" style={{ background: color }} /> <strong>{curve.label}: {curve.startTime.toFixed(2)}s → {curve.endTime.toFixed(2)}s</strong></div>
+        <span>{curve.amount < .5 ? 'No change' : `${Math.round(curve.amount)} ${curve.channel === 'position' ? 'px travelled' : '° turned'}`}</span>
       </div>
-      <svg viewBox="0 0 312 168" role="img" aria-label={`${channel} easing curve for ${label}`}>
+      <svg viewBox="0 0 312 168" role="img" aria-label={`${curve.channel} easing curve for ${curve.label}, ${curve.startTime.toFixed(2)} to ${curve.endTime.toFixed(2)} seconds`}>
         <path className="easing-grid" d={`M${GRAPH.left} ${GRAPH.top}V${GRAPH.bottom}H${GRAPH.right}M${GRAPH.left} ${GRAPH.top}H${GRAPH.right}M${GRAPH.left} ${(GRAPH.top + GRAPH.bottom) / 2}H${GRAPH.right}`} />
         <line className="handle-line" x1={GRAPH.left} y1={GRAPH.bottom} x2={mapX(x1)} y2={mapY(y1)} />
         <line className="handle-line" x1={GRAPH.right} y1={GRAPH.top} x2={mapX(x2)} y2={mapY(y2)} />
