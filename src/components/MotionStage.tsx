@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { LocateFixed, Minus, Plus } from 'lucide-react'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
 import type Konva from 'konva'
+import { ThemeContext } from './layout/ThemeContext'
 import type { MotionObject, MotionSample } from '../types'
 
 interface MotionStageProps {
@@ -13,8 +14,8 @@ interface MotionStageProps {
   motionPath?: MotionSample[]
 }
 
-const WORLD_WIDTH = 2000
-const WORLD_HEIGHT = 1400
+const WORLD_WIDTH = 1024
+const WORLD_HEIGHT = 1024
 const MIN_ZOOM = .35
 const MAX_ZOOM = 3
 
@@ -45,6 +46,10 @@ function LoadedImage({ src }: { src?: string }) {
 }
 
 export function MotionStage({ object, onChange, previewPosition, countdown, recording, motionPath = [] }: MotionStageProps) {
+  const theme = useContext(ThemeContext)
+  const canvasColors = theme === 'light'
+    ? { background: '#ffffff', grid: '#e3e9e6', border: '#cad5d0', selection: '#087749', anchorBorder: '#ffffff' }
+    : { background: '#111b20', grid: '#223039', border: '#334149', selection: '#b8ffd9', anchorBorder: '#10191e' }
   const containerRef = useRef<HTMLDivElement>(null)
   const shapeRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -53,6 +58,7 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
   const display = previewPosition ?? object
   const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 })
   const [activeSnap, setActiveSnap] = useState<'horizontal' | 'vertical' | null>(null)
+  const [snapGuidePosition, setSnapGuidePosition] = useState(0)
   const hasCentered = useRef(false)
   const dragMotion = useRef<{
     originX: number
@@ -66,7 +72,7 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
   const filteredRotation = useRef<number | null>(null)
 
   const clampPosition = useCallback((position: { x: number; y: number }) => {
-    const padding = 12
+    const padding = 0
     return {
       x: Math.min(Math.max(position.x, padding), WORLD_WIDTH - object.width - padding),
       y: Math.min(Math.max(position.y, padding), WORLD_HEIGHT - object.height - padding),
@@ -92,7 +98,7 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     const parent = node.getParent()
     if (!parent) return { x: node.x(), y: node.y() }
 
-    const padding = 12
+    const padding = 0
     const bounds = node.getClientRect({ relativeTo: parent, skipShadow: true })
     let x = node.x()
     let y = node.y()
@@ -210,23 +216,31 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     const absY = Math.abs(deltaY)
     let snap = state.snap
 
-    if (snap === 'horizontal' && absY > Math.max(16, absX * .14)) snap = null
-    if (snap === 'vertical' && absX > Math.max(16, absY * .14)) snap = null
-    if (!snap && Math.max(absX, absY) > 36) {
-      if (absY <= Math.max(7, absX * .08)) snap = 'horizontal'
-      else if (absX <= Math.max(7, absY * .08)) snap = 'vertical'
+    if (snap === 'horizontal' && absY > Math.max(24, absX * .22)) snap = null
+    if (snap === 'vertical' && absX > Math.max(24, absY * .22)) snap = null
+    if (!snap && Math.max(absX, absY) > 24) {
+      if (absY <= Math.max(10, absX * .12)) snap = 'horizontal'
+      else if (absX <= Math.max(10, absY * .12)) snap = 'vertical'
     }
 
-    const magneticStrength = .06
+    const magneticStrength = .015
     const targetX = snap === 'vertical' ? state.originX + deltaX * magneticStrength : rawX
     const targetY = snap === 'horizontal' ? state.originY + deltaY * magneticStrength : rawY
     const smoothing = .24
-    const filteredX = state.filteredX + (targetX - state.filteredX) * smoothing
-    const filteredY = state.filteredY + (targetY - state.filteredY) * smoothing
+    const minX = object.width / 2
+    const maxX = WORLD_WIDTH - object.width / 2
+    const minY = object.height / 2
+    const maxY = WORLD_HEIGHT - object.height / 2
+    // Boundary contact overrides smoothing and snapping, so the shape hits the wall exactly.
+    const filteredX = rawX <= minX ? minX : rawX >= maxX ? maxX : state.filteredX + (targetX - state.filteredX) * smoothing
+    const filteredY = rawY <= minY ? minY : rawY >= maxY ? maxY : state.filteredY + (targetY - state.filteredY) * smoothing
 
     event.target.position({ x: filteredX, y: filteredY })
     dragMotion.current = { ...state, filteredX, filteredY, rawX, rawY, snap }
-    if (snap !== state.snap) setActiveSnap(snap)
+    if (snap !== state.snap) {
+      setActiveSnap(snap)
+      if (snap) setSnapGuidePosition(snap === 'horizontal' ? state.originY : state.originX)
+    }
     onChange({ ...object, x: filteredX - object.width / 2, y: filteredY - object.height / 2 })
   }
 
@@ -256,17 +270,23 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
     })
   }
 
-  const renderShape = () => {
+  const renderShape = (outline = false) => {
+    const appearance = outline
+      ? { stroke: '#93a1a9', strokeWidth: 1.5 / viewport.scale, fillEnabled: false, listening: false }
+      : { fill: object.kind === 'image' ? undefined : object.fill }
+    if (outline && object.kind === 'image') {
+      return <Rect {...appearance} width={object.width} height={object.height} cornerRadius={18} />
+    }
     if (object.kind === 'image' && image) {
-      return <KonvaImage image={image} width={object.width} height={object.height} cornerRadius={18} />
+      return <KonvaImage {...appearance} image={image} width={object.width} height={object.height} cornerRadius={18} />
     }
     if (object.kind === 'circle') {
-      return <Circle x={object.width / 2} y={object.height / 2} radius={Math.min(object.width, object.height) / 2} fill={object.fill} />
+      return <Circle {...appearance} x={object.width / 2} y={object.height / 2} radius={Math.min(object.width, object.height) / 2} />
     }
     if (object.kind === 'triangle') {
-      return <Line points={[object.width / 2, 0, object.width, object.height, 0, object.height]} closed fill={object.fill} lineJoin="round" />
+      return <Line {...appearance} points={[object.width / 2, 0, object.width, object.height, 0, object.height]} closed lineJoin="round" />
     }
-    return <Rect width={object.width} height={object.height} fill={object.fill} cornerRadius={24} />
+    return <Rect {...appearance} width={object.width} height={object.height} cornerRadius={24} />
   }
 
   const endX = object.x
@@ -289,28 +309,41 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
       <Stage width={size.width} height={size.height} onWheel={handleWheel}>
         <Layer listening={false}>
           <Group x={viewport.x} y={viewport.y} scaleX={viewport.scale} scaleY={viewport.scale}>
-            <Rect width={WORLD_WIDTH} height={WORLD_HEIGHT} fill="#111b20" stroke="#334149" strokeWidth={1 / viewport.scale} />
-            {Array.from({ length: Math.ceil(WORLD_WIDTH / 40) + 1 }).map((_, index) => (
-              <Line key={`v-${index}`} points={[index * 40, 0, index * 40, WORLD_HEIGHT]} stroke="#223039" strokeWidth={1 / viewport.scale} />
+            <Rect width={WORLD_WIDTH} height={WORLD_HEIGHT} fill={canvasColors.background} stroke={canvasColors.border} strokeWidth={1 / viewport.scale} />
+            {Array.from({ length: Math.floor(WORLD_WIDTH / 40) + 1 }).map((_, index) => (
+              <Line key={`v-${index}`} points={[index * 40, 0, index * 40, WORLD_HEIGHT]} stroke={canvasColors.grid} strokeWidth={1 / viewport.scale} />
             ))}
-            {Array.from({ length: Math.ceil(WORLD_HEIGHT / 40) + 1 }).map((_, index) => (
-              <Line key={`h-${index}`} points={[0, index * 40, WORLD_WIDTH, index * 40]} stroke="#223039" strokeWidth={1 / viewport.scale} />
+            {Array.from({ length: Math.floor(WORLD_HEIGHT / 40) + 1 }).map((_, index) => (
+              <Line key={`h-${index}`} points={[0, index * 40, WORLD_WIDTH, index * 40]} stroke={canvasColors.grid} strokeWidth={1 / viewport.scale} />
             ))}
-            {activeSnap === 'horizontal' && <Line points={[0, dragMotion.current?.originY ?? object.y, WORLD_WIDTH, dragMotion.current?.originY ?? object.y]} stroke="#b8ffd9" opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
-            {activeSnap === 'vertical' && <Line points={[dragMotion.current?.originX ?? object.x, 0, dragMotion.current?.originX ?? object.x, WORLD_HEIGHT]} stroke="#b8ffd9" opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
-            <Line
-              points={trailPoints}
-              stroke="#63727a"
-              strokeWidth={1.5 / viewport.scale}
-              dash={[7 / viewport.scale, 8 / viewport.scale]}
-              tension={motionPath.length > 2 ? .18 : 0}
-              lineCap="round"
-              lineJoin="round"
-            />
-            <Circle x={startCenter.x} y={startCenter.y} radius={5 / viewport.scale} fill="#0f171c" stroke="#93a1a9" />
-            <Circle x={endCenter.x} y={endCenter.y} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
-            <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
-            <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
+            {activeSnap === 'horizontal' && <Line points={[0, snapGuidePosition, WORLD_WIDTH, snapGuidePosition]} stroke={canvasColors.selection} opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
+            {activeSnap === 'vertical' && <Line points={[snapGuidePosition, 0, snapGuidePosition, WORLD_HEIGHT]} stroke={canvasColors.selection} opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
+            {(recording || motionPath.length > 0) && (
+              <Group>
+                <Line
+                  points={trailPoints}
+                  stroke="#63727a"
+                  strokeWidth={1.5 / viewport.scale}
+                  dash={[7 / viewport.scale, 8 / viewport.scale]}
+                  tension={motionPath.length > 2 ? .18 : 0}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+                <Group
+                  name="recording-start-outline"
+                  x={startCenter.x}
+                  y={startCenter.y}
+                  offsetX={object.width / 2}
+                  offsetY={object.height / 2}
+                  rotation={object.startRotation ?? motionPath[0]?.rotation ?? object.rotation}
+                >
+                  {renderShape(true)}
+                </Group>
+                <Circle x={endCenter.x} y={endCenter.y} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
+                <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
+                <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
+              </Group>
+            )}
           </Group>
         </Layer>
         <Layer>
@@ -331,17 +364,16 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
               onTransform={stabilizeTransform}
               onTransformEnd={() => { filteredRotation.current = null; commitTransform() }}
             >
-              <Rect width={object.width} height={object.height} fill="#000" opacity={0.18} cornerRadius={24} x={8} y={10} listening={false} />
               {renderShape()}
             </Group>
             {!previewPosition && (
               <Transformer
                 ref={transformerRef}
                 rotateEnabled
-                borderStroke="#b8ffd9"
+                borderStroke={canvasColors.selection}
                 borderStrokeWidth={1.5 / viewport.scale}
-                anchorFill="#b8ffd9"
-                anchorStroke="#10191e"
+                anchorFill={canvasColors.selection}
+                anchorStroke={canvasColors.anchorBorder}
                 anchorSize={10 / viewport.scale}
                 anchorCornerRadius={5 / viewport.scale}
                 rotateAnchorOffset={28 / viewport.scale}

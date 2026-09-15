@@ -53,6 +53,17 @@ describe('buildMotionResult', () => {
     })
   })
 
+  it('formats position instructions with hyphenated axes and compact pixel units', () => {
+    const result = buildMotionResult([
+      { time: 0, x: 14, y: 123, rotation: 0 },
+      { time: .25, x: 476, y: 133, rotation: 0 },
+    ])
+    assert.deepEqual(result.steps.filter(step => step.channel === 'position').map(step => step.description), [
+      'Set x-position to 14px, y-position to 123px.',
+      'Set x-position to 476px, y-position to 133px.',
+    ])
+  })
+
   it('omits unchanged property tracks for stationary motion', () => {
     const stationary = normalMotion.map(sample => ({ ...sample, x: 20, y: 30, rotation: 40 }))
     const result = buildMotionResult(stationary)

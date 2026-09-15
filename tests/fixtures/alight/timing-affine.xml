@@ -1,0 +1,15 @@
+<!-- Synthetic arithmetic contract; not evidence from an Alight renderer. -->
+<scene title="Synthetic trimmed affine clocks" totalTime="5000" fps="30">
+  <embedScene id="outer" startTime="1000" endTime="1200" speed="2" inTime="100" outTime="500">
+    <scene totalTime="800" fps="60" retime="off">
+      <shape id="track" startTime="0" endTime="800">
+        <transform><rotation><kf t="0.25" v="0"/><kf t="0.625" v="90"/><kf t="0" v="180"/></rotation></transform>
+      </shape>
+      <embedScene id="inner" startTime="100" endTime="300" speed="2" inTime="0" outTime="400">
+        <scene totalTime="400" fps="24" retime="off">
+          <shape id="deep" startTime="0" endTime="400"><transform><rotation><kf t="0.5" v="45"/></rotation></transform></shape>
+        </scene>
+      </embedScene>
+    </scene>
+  </embedScene>
+</scene>

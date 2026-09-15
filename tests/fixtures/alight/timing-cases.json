@@ -1,0 +1,45 @@
+[
+  {
+    "file": "Odette x Sing me to sleep.xml",
+    "policy": {
+      "id": "layer-relative-v1",
+      "keyframeBasis": "layer-duration",
+      "embeddedMapping": "affine",
+      "omittedSpeed": 1,
+      "omittedInTime": 0
+    },
+    "groups": [
+      {
+        "id": "205149990",
+        "projectInterval": [2333, 3032],
+        "childIds": ["205149984", "205149985", "205149986", "205149987", "205149988"],
+        "effectId": "com.alightcreative.effects.flip3",
+        "propertyName": "angle",
+        "sourceSequences": [
+          ["0.977110", "0.024320"],
+          ["0.690987", "0.024320"],
+          ["0.500715", "0.024320"],
+          ["0.977110", "0.024320"],
+          ["0.024320", "0.977110"]
+        ],
+        "projectSequences": [
+          [3015.99989, 2349.99968],
+          [2815.999913, 2349.99968],
+          [2682.999785, 2349.99968],
+          [3015.99989, 2349.99968],
+          [2349.99968, 3015.99989]
+        ]
+      }
+    ],
+    "parentCases": [
+      {
+        "parentId": "205149971",
+        "childId": "205149960",
+        "projectInterval": [5100, 5799],
+        "propertyName": "location",
+        "sourceSequence": ["0.022890", "0.786838"],
+        "projectSequence": [5116.00011, 5649.999762]
+      }
+    ]
+  }
+]

@@ -295,3 +295,36 @@ h1 { font: 600 26px/1.1 Manrope, sans-serif; letter-spacing: -.04em; margin-bott
 :root[data-theme='light'] .tip-card p { color: #686477; }
 :root[data-theme='light'] .generate-button { color: #087749; background: #e5f3eb; border-color: #b5d8c4; }
 :root[data-theme='light'] .generate-button:hover { background: #daeee3; border-color: #85b99c; }
+
+.instruction[data-channel='rotation'] > span { color: var(--violet); background: #211c33; border-color: #51416f; }
+:root[data-theme='light'] .instruction[data-channel='rotation'] > span { color: var(--violet); background: #f1edfc; border-color: #d8cdf8; }
+
+.shape-color-picker { position: relative; }
+.shape-color-trigger { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+.shape-color-trigger > span { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #8886; }
+.shape-color-trigger:disabled { opacity: .45; cursor: default; }
+.shape-color-panel { position: absolute; z-index: 20; top: calc(100% + 8px); left: -90px; width: min(264px, calc(100vw - 60px)); padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: inherit; box-shadow: 0 12px 32px #0004; display: grid; gap: 12px; }
+.color-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.color-presets button { height: 23px; border: 1px solid #8886; border-radius: 50%; cursor: pointer; }
+.color-presets button[aria-pressed='true'] { outline: 2px solid var(--violet); outline-offset: 2px; }
+.color-spectrum { height: 130px; border-radius: 7px; border: 1px solid var(--line); touch-action: none; cursor: crosshair; background: linear-gradient(to bottom, #fff, #fff0 50%, #000), linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.color-slider { display: grid; grid-template-columns: 55px 1fr; gap: 6px; align-items: center; font-size: 10px; }
+.color-slider input { width: 100%; min-width: 0; accent-color: var(--violet); }
+.shape-color-panel form { display: grid; gap: 6px; }
+.color-custom { display: flex; gap: 6px; }
+.color-custom input { width: 0; flex: 1; padding: 7px; border: 1px solid var(--line); background: var(--panel-soft); color: inherit; border-radius: 5px; font-size: 11px; }
+.color-custom button { border: 1px solid var(--line); background: var(--panel-soft); border-radius: 5px; cursor: pointer; font-size: 11px; }
+.shape-color-panel input:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.shape-color-panel p { margin: 0; color: #e87784; font-size: 10px; line-height: 1.4; }
+
+.color-spectrum { position: relative; }
+.color-spectrum-dot { position: absolute; width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #0009, 0 1px 4px #0005; transform: translate(-50%, -50%); pointer-events: none; }
+
+:root[data-theme='light'] .stage-container { background: #ffffff; }
+:root[data-theme='light'] .stage-hint { color: #68766f; background: #ffffffe6; border-color: #cad5d0; }
+:root[data-theme='light'] .viewport-controls { color: #52665c; background: #fffffff2; border-color: #cad5d0; box-shadow: 0 5px 16px #50675a18; }
+:root[data-theme='light'] .viewport-controls button { color: #52665c; }
+:root[data-theme='light'] .viewport-controls button:hover { color: #087749; background: #e6f3eb; }
+:root[data-theme='light'] .viewport-controls button:last-child { border-color: #cad5d0; }
+
+.topbar > .top-actions { margin-left: auto; }

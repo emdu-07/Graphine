@@ -8,17 +8,21 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "alight:inspect": "node --experimental-strip-types scripts/alight-inspect.ts",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "konva": "latest",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-konva": "latest"
+    "react-konva": "latest",
+    "saxes": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "latest",
+    "@types/node": "^26.4.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "^5.0.4",

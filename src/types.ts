@@ -20,6 +20,7 @@ export interface MotionObject {
   y: number
   startX: number
   startY: number
+  startRotation?: number
   width: number
   height: number
   rotation: number

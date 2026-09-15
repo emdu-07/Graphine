@@ -146,7 +146,7 @@ function buildSteps(keyframes: Record<MotionChannel, MotionKeyframe[]>): MotionG
       index: index + 1,
       channel: 'position' as const,
       title: `Position keyframe at ${keyframe.time.toFixed(2)} seconds`,
-      description: `Set Position to X ${Math.round(keyframe.x)} px and Y ${Math.round(keyframe.y)} px.`,
+      description: `Set x-position to ${Math.round(keyframe.x)}px, y-position to ${Math.round(keyframe.y)}px.`,
     })),
     ...keyframes.rotation.map((keyframe, index) => ({
       id: `rotation-keyframe-${index + 1}`,
