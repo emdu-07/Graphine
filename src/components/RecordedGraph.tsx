@@ -1,6 +1,7 @@
 import { Copy } from 'lucide-react'
 import { useState } from 'react'
 import type { MotionCurve } from '../motion/types'
+import { defaultEasingEmphasis, emphasizeEasing } from '../easing'
 
 interface RecordedGraphProps {
   curve: MotionCurve
@@ -10,7 +11,9 @@ const GRAPH = { left: 28, right: 284, top: 18, bottom: 146 }
 
 export function RecordedGraph({ curve }: RecordedGraphProps) {
   const [copied, setCopied] = useState(false)
-  const [x1, y1, x2, y2] = curve.cubic
+  const emphasis = defaultEasingEmphasis(curve.endTime - curve.startTime)
+  const cubic = emphasizeEasing(curve.cubic, emphasis)
+  const [x1, y1, x2, y2] = cubic
   const width = GRAPH.right - GRAPH.left
   const height = GRAPH.bottom - GRAPH.top
   const mapX = (value: number) => GRAPH.left + value * width
@@ -19,8 +22,8 @@ export function RecordedGraph({ curve }: RecordedGraphProps) {
   const handleY = (value: number) => Math.max(GRAPH.top, Math.min(GRAPH.bottom, mapY(value)))
   const trace = curve.points.map(point => `${mapX(point.time).toFixed(1)},${mapY(point.progress).toFixed(1)}`).join(' ')
   const path = `M ${GRAPH.left} ${GRAPH.bottom} C ${mapX(x1)} ${mapY(y1)}, ${mapX(x2)} ${mapY(y2)}, ${GRAPH.right} ${GRAPH.top}`
-  const color = curve.channel === 'position' ? '#a7f7d2' : '#b7a5ff'
-  const values = curve.cubic.map(value => value.toFixed(2)).join(', ')
+  const color = curve.channel === 'position' ? 'var(--position-curve)' : '#b7a5ff'
+  const values = cubic.map(value => value.toFixed(2)).join(', ')
 
   const copyCurve = async () => {
     await navigator.clipboard.writeText(values)

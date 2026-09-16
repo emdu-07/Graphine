@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import type { ViteDevServer } from 'vite'
+import { emphasizeEasing } from '../src/easing.ts'
 import { buildMotionResult } from '../src/motion/engine.ts'
 
 // Use the application's existing TSX transform without adding a test dependency.
@@ -56,7 +57,7 @@ it('renders only the selected channel using the engine-supplied curve handles', 
     assert.match(html, new RegExp(`aria-label="${curveChannel} easing curve`))
     assert.doesNotMatch(html, new RegExp(`aria-label="${curveChannel === 'position' ? 'rotation' : 'position'} easing curve`))
     const curve = result.curves.find(curve => curve.channel === curveChannel)!
-    assert.ok(html.includes(curve.cubic.map(value => value.toFixed(2)).join(', ')))
+    assert.ok(html.includes(emphasizeEasing(curve.cubic, .6).map(value => value.toFixed(2)).join(', ')))
   }
 })
 
@@ -81,12 +82,24 @@ it('keeps overshooting handle markers and guide lines inside the graph while ret
   const { RecordedGraph } = await server.ssrLoadModule('/src/components/RecordedGraph.tsx')
   const curve = { ...result.curves[0], cubic: [.33, 1.36, .67, -.2] }
   const html = renderToStaticMarkup(createElement(RecordedGraph, { curve }))
+  assert.doesNotMatch(html, /type="range"|Curve emphasis/)
   const markers = [...html.matchAll(/class="curve-handle"[^>]*cy="([^"]+)"/g)]
   assert.deepEqual(markers.map(match => Number(match[1])), [18, 146])
   const guides = [...html.matchAll(/class="handle-line"[^>]*y2="([^"]+)"/g)]
   assert.deepEqual(guides.map(match => Number(match[1])), [18, 146])
-  assert.ok(html.includes('0.33, 1.36, 0.67, -0.20'))
-  assert.match(html, /C 112\.48 -28\.080000000000013, 199\.52 171\.6/)
+  assert.ok(html.includes('0.33, 1.50, 0.67, -0.50'))
+  assert.match(html, /C 112\.48 -46, 199\.52 210/)
+})
+
+it('uses emphasized handles for short intervals and original handles for long intervals', async () => {
+  const { RecordedGraph } = await server.ssrLoadModule('/src/components/RecordedGraph.tsx')
+  for (const [duration, strength] of [[1.23, .6], [3, 0]]) {
+    const curve = { ...result.curves[0], startTime: 5, endTime: 5 + duration, cubic: [.33, .96, .67, .51] as [number, number, number, number] }
+    const html = renderToStaticMarkup(createElement(RecordedGraph, { curve }))
+    assert.doesNotMatch(html, /type="range"|Curve emphasis/)
+    assert.ok(html.includes('stroke:var(--position-curve)'))
+    assert.ok(html.includes(emphasizeEasing(curve.cubic, strength).map(value => value.toFixed(2)).join(', ')))
+  }
 })
 
 it('provides an accessible shape color dropdown that can be disabled during capture', async () => {

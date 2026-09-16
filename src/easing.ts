@@ -6,6 +6,28 @@ export interface DerivedEasing {
   amount: number
 }
 
+// Short gestures (including the 1.23s reference) get the stronger default.
+export const SHORT_EASING_INTERVAL_SECONDS = 1.5
+
+export function defaultEasingEmphasis(durationSeconds: number): number {
+  return Number.isFinite(durationSeconds) && durationSeconds > 0 && durationSeconds <= SHORT_EASING_INTERVAL_SECONDS ? .6 : 0
+}
+
+/** Stylize the fitted curve by expanding handle offsets from linear timing.
+ * This is an explicit creative adjustment, not a new measurement of the capture.
+ * Zero preserves the original fit; linear curves remain linear at any strength.
+ */
+export function emphasizeEasing(
+  cubic: [number, number, number, number],
+  strength: number,
+): [number, number, number, number] {
+  const amount = Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 0
+  if (amount === 0) return [...cubic]
+  const [x1, y1, x2, y2] = cubic
+  const expand = (x: number, y: number) => Math.max(-.5, Math.min(1.5, x + (y - x) * (1 + amount)))
+  return [x1, expand(x1, y1), x2, expand(x2, y2)]
+}
+
 export function deriveEasing(samples: MotionSample[], channel: MotionChannel): DerivedEasing {
   if (samples.length < 2) {
     return { points: [{ time: 0, progress: 0 }, { time: 1, progress: 1 }], cubic: [.33, .33, .67, .67], amount: 0 }

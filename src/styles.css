@@ -328,3 +328,7 @@ h1 { font: 600 26px/1.1 Manrope, sans-serif; letter-spacing: -.04em; margin-bott
 :root[data-theme='light'] .viewport-controls button:last-child { border-color: #cad5d0; }
 
 .topbar > .top-actions { margin-left: auto; }
+
+
+.easing-card { --position-curve: #26c98b; }
+:root[data-theme='light'] .easing-card { --position-curve: #087749; }
