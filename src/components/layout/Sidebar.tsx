@@ -8,7 +8,7 @@ interface SidebarProps {
 export function Sidebar({ theme, onToggleTheme }: SidebarProps) {
   return (
     <aside className="sidebar">
-      <div className="brand-mark"><Aperture size={25} /><span>graphine</span></div>
+      <div className="brand-mark"><Aperture size={25} /><span>Graphine</span></div>
       <nav className="side-nav" aria-label="Main navigation">
         <button className="nav-button active" aria-label="Motion Canvas" title="Motion Canvas"><MousePointer2 size={19} /><span className="nav-label">Motion</span></button>
         <button className="nav-button" aria-label="Layers"><Layers3 size={19} /><span className="nav-label">Layers</span></button>

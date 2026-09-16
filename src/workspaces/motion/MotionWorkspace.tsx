@@ -142,15 +142,15 @@ export function MotionWorkspace() {
             <span className="timecode">{elapsed.toFixed(1)}s</span>
             <div className="timeline"><div className="timeline-fill" style={{ width: `${progress * 100}%` }} /><span className="timeline-thumb" style={{ left: `${progress * 100}%` }} /></div>
             <span className="timecode">{duration.toFixed(1)}s</span>
-            <label className="duration-control"><span>RECORD FOR</span><select value={duration} disabled={phase === 'recording' || phase === 'countdown'} onChange={(event) => setDuration(Number(event.target.value))} aria-label="Recording duration"><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option></select></label>
+            <label className="duration-control"><span>Record for:</span><select value={duration} disabled={phase === 'recording' || phase === 'countdown'} onChange={(event) => setDuration(Number(event.target.value))} aria-label="Recording duration"><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option></select></label>
             <button className={`record-button ${phase === 'recording' ? 'stop' : ''}`} onClick={phase === 'recording' ? stopCapture : startCapture} disabled={phase === 'countdown'}>{phase === 'recording' ? <StopCircle size={15} /> : <span className="record-dot" />}{captureLabel}</button>
           </div>
         </div>
 
         <div className="capture-help">
-          <div><span>1</span><p><strong>Choose a duration</strong>Select how long you want to perform.</p></div>
-          <div><span>2</span><p><strong>Press record</strong>Wait for the 3–2–1 countdown.</p></div>
-          <div><span>3</span><p><strong>Move freely</strong>Drag and rotate until time runs out.</p></div>
+          <div><span>1</span><p><strong>Choose how long you want to record for</strong></p></div>
+          <div><span>2</span><p><strong>Press record</strong>You'll get a 3-second countdown.</p></div>
+          <div><span>3</span><p><strong>Move your object in whatever motion you want</strong>Learn what graphs you can use to recreate it!</p></div>
         </div>
       </section>
 
