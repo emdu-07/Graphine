@@ -19,7 +19,7 @@ export function Sidebar({ theme, onToggleTheme }: SidebarProps) {
           {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}<span className="nav-label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
         </button>
         <button className="nav-button"><HelpCircle size={19} /><span className="nav-label">Help</span></button>
-        <button className="account-button"><span className="avatar">EM</span><span className="nav-label">Account</span></button>
+        <button className="account-button"><span className="avatar">EM</span><span className="nav-label">E.M</span></button>
       </div>
     </aside>
   )
