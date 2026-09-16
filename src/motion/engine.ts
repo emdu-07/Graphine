@@ -1,3 +1,4 @@
+import { detectPositionCorners } from './corners.ts'
 import { deriveEasing } from '../easing.ts'
 import type {
   MotionChannel,
@@ -57,29 +58,7 @@ function selectPositionKeyframeIndices(samples: MotionSample[]): number[] {
   )
   if (!motionRange) return []
 
-  const boundaryIndices = new Set([motionRange.startIndex, motionRange.endIndex])
-  let positionAnchorIndex = motionRange.startIndex
-  let previousPositionDirection: { x: number; y: number } | undefined
-
-  for (let index = motionRange.startIndex + 1; index <= motionRange.endIndex; index += 1) {
-    const sample = samples[index]
-    const positionAnchor = samples[positionAnchorIndex]
-    const deltaX = sample.x - positionAnchor.x
-    const deltaY = sample.y - positionAnchor.y
-    const distance = Math.hypot(deltaX, deltaY)
-
-    if (distance >= MIN_POSITION_CHANGE) {
-      const direction = { x: deltaX / distance, y: deltaY / distance }
-      if (previousPositionDirection) {
-        const similarity = previousPositionDirection.x * direction.x + previousPositionDirection.y * direction.y
-        if (similarity <= 0) boundaryIndices.add(positionAnchorIndex)
-      }
-      previousPositionDirection = direction
-      positionAnchorIndex = index
-    }
-  }
-
-  return [...boundaryIndices].sort((left, right) => left - right)
+  return [motionRange.startIndex, ...detectPositionCorners(samples, motionRange.startIndex, motionRange.endIndex), motionRange.endIndex]
 }
 
 function selectRotationKeyframeIndices(samples: MotionSample[]): number[] {

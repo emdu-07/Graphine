@@ -102,6 +102,16 @@ it('uses emphasized handles for short intervals and original handles for long in
   }
 })
 
+it('renders two linear graphs for a constant-speed right-angle turn', async () => {
+  const { MotionGraphs } = await server.ssrLoadModule('/src/workspaces/motion/MotionGraphs.tsx')
+  const motionResult = buildMotionResult([[0, 0], [10, 0], [20, 0], [20, 10], [20, 20]].map(([x, y], i) => ({ time: i * .1, x, y, rotation: 0 })))
+  const html = renderToStaticMarkup(createElement(MotionGraphs, {
+    motionResult, curveChannel: 'position', setCurveChannel: () => {}, onShowSteps: () => {},
+  }))
+  assert.equal([...html.matchAll(/class="easing-card"/g)].length, 2)
+  assert.equal([...html.matchAll(/0.33, 0.33, 0.67, 0.67/g)].length, 2)
+})
+
 it('provides an accessible shape color dropdown that can be disabled during capture', async () => {
   const { ShapeColorPicker } = await server.ssrLoadModule('/src/components/ShapeColorPicker.tsx')
   for (const disabled of [true, false]) {

@@ -8,6 +8,7 @@ export interface DerivedEasing {
 
 // Short gestures (including the 1.23s reference) get the stronger default.
 export const SHORT_EASING_INTERVAL_SECONDS = 1.5
+export const LINEAR_PROGRESS_TOLERANCE = .025
 
 export function defaultEasingEmphasis(durationSeconds: number): number {
   return Number.isFinite(durationSeconds) && durationSeconds > 0 && durationSeconds <= SHORT_EASING_INTERVAL_SECONDS ? .6 : 0
@@ -53,6 +54,12 @@ export function deriveEasing(samples: MotionSample[], channel: MotionChannel): D
     time: (sample.time - startTime) / duration,
     progress: hasMotion ? distances[index] / total : (sample.time - startTime) / duration,
   }))
+
+  // Allow small capture noise (2.5% of segment progress). Exact linear handles
+  // also remain unchanged by emphasis, even for very short intervals.
+  if (points.every(point => Math.abs(point.progress - point.time) <= LINEAR_PROGRESS_TOLERANCE)) {
+    return { points, cubic: [.33, .33, .67, .67], amount: total }
+  }
 
   // Fit the captured progress to a cubic Bézier with fixed, evenly-spaced X handles.
   // This gives users four values they can reproduce in Alight Motion's curve editor.

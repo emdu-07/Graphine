@@ -61,6 +61,22 @@ it('shows the motion markers during recording and for a captured path', async ()
   }
 })
 
+it('overlays the unsmoothed dotted trajectory and marks its start, corner and end', async () => {
+  const motionPath = [[100, 100], [110, 100], [120, 100], [120, 110], [120, 120]].map(([x, y], i) => ({ time: i * .1, x, y, rotation: 0 }))
+  await render({ motionPath })
+  const overlay = scene.findIndex(node => node.props.name === 'motion-path-overlay')
+  const shape = scene.findIndex(node => node.props.fill === object.fill)
+  assert.ok(overlay > shape)
+  assert.equal(scene[overlay].props.listening, false)
+  const trail = scene.find(node => node.props.name === 'recorded-motion-path')!
+  assert.deepEqual(trail.props.points, motionPath.flatMap(p => [p.x + 63, p.y + 63]))
+  assert.deepEqual(trail.props.dash, [2, 5])
+  assert.equal(trail.props.tension, 0)
+  const dots = scene.filter(node => node.props.name === 'motion-change-marker')
+  assert.deepEqual(dots.map(node => [node.props.x, node.props.y]), [[163, 163], [183, 163], [183, 183]])
+  assert.ok(dots.every(node => node.props.radius === 3))
+})
+
 it('renders shapes without shadows and keeps selection bounds aligned', async () => {
   for (const kind of ['square', 'circle', 'triangle']) {
     await render({ object: { ...object, kind } })

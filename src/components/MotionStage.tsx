@@ -1,8 +1,9 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LocateFixed, Minus, Plus } from 'lucide-react'
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { ThemeContext } from './layout/ThemeContext'
+import { buildMotionResult } from '../motion/engine'
 import type { MotionObject, MotionSample } from '../types'
 
 interface MotionStageProps {
@@ -47,6 +48,7 @@ function LoadedImage({ src }: { src?: string }) {
 
 export function MotionStage({ object, onChange, previewPosition, countdown, recording, motionPath = [] }: MotionStageProps) {
   const theme = useContext(ThemeContext)
+  const positionKeys = useMemo(() => buildMotionResult(motionPath).keyframes.position, [motionPath])
   const canvasColors = theme === 'light'
     ? { background: '#ffffff', grid: '#e3e9e6', border: '#cad5d0', selection: '#087749', anchorBorder: '#ffffff' }
     : { background: '#111b20', grid: '#223039', border: '#334149', selection: '#b8ffd9', anchorBorder: '#10191e' }
@@ -320,15 +322,6 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
             {activeSnap === 'vertical' && <Line points={[snapGuidePosition, 0, snapGuidePosition, WORLD_HEIGHT]} stroke={canvasColors.selection} opacity={.55} strokeWidth={1 / viewport.scale} dash={[5 / viewport.scale, 6 / viewport.scale]} />}
             {(recording || motionPath.length > 0) && (
               <Group>
-                <Line
-                  points={trailPoints}
-                  stroke="#63727a"
-                  strokeWidth={1.5 / viewport.scale}
-                  dash={[7 / viewport.scale, 8 / viewport.scale]}
-                  tension={motionPath.length > 2 ? .18 : 0}
-                  lineCap="round"
-                  lineJoin="round"
-                />
                 <Group
                   name="recording-start-outline"
                   x={startCenter.x}
@@ -339,7 +332,6 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
                 >
                   {renderShape(true)}
                 </Group>
-                <Circle x={endCenter.x} y={endCenter.y} radius={5 / viewport.scale} fill="#b8ffd9" stroke="#0f171c" />
                 <Text x={object.startX - 8} y={object.startY + object.height + 13} text="START" fill="#75838b" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
                 <Text x={endX - 2} y={endY + object.height + 13} text="END" fill="#8de8ba" fontSize={10 / viewport.scale} fontFamily="DM Sans" />
               </Group>
@@ -390,6 +382,30 @@ export function MotionStage({ object, onChange, previewPosition, countdown, reco
             )}
           </Group>
         </Layer>
+        {(recording || motionPath.length > 0) && (
+          <Layer listening={false} name="motion-path-overlay">
+            <Group x={viewport.x} y={viewport.y} scaleX={viewport.scale} scaleY={viewport.scale}>
+              <Line
+                name="recorded-motion-path"
+                points={trailPoints}
+                stroke="#63727a"
+                strokeWidth={1.5 / viewport.scale}
+                dash={[2 / viewport.scale, 5 / viewport.scale]}
+                tension={0}
+                lineCap="round"
+                lineJoin="round"
+              />
+              {[
+                motionPath[0] ?? { x: object.startX, y: object.startY },
+                ...positionKeys.slice(1, -1),
+                ...(motionPath.length > 1 ? [motionPath.at(-1)!] : []),
+              ].map((sample, index) => {
+                const center = centerAt(sample.x, sample.y)
+                return <Circle key={index} name="motion-change-marker" x={center.x} y={center.y} radius={3 / viewport.scale} fill={theme === 'light' ? '#52636c' : '#b7c7cf'} stroke={theme === 'light' ? '#ffffff' : '#111b20'} strokeWidth={1 / viewport.scale} />
+              })}
+            </Group>
+          </Layer>
+        )}
       </Stage>
       {countdown !== null && countdown !== undefined && (
         <div className="countdown-overlay"><span>GET READY</span><strong key={countdown}>{countdown}</strong><small>Grab the object when recording starts</small></div>

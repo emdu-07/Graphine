@@ -120,7 +120,7 @@ export function MotionWorkspace() {
     <div className="content-grid">
       <section className="design-panel">
         <div className="panel-heading">
-          <div><p className="kicker">MOTION CANVAS</p><h1>Make your move.</h1></div>
+          <div><h1>Motion Canvas</h1><p className="kicker">Move an object and see its easing curves!</p></div>
           <div className="canvas-tools">
             <div className="shape-menu-wrap">
               <button className="tool-button" onClick={() => setShowShapes(!showShapes)} disabled={phase === 'recording'}><Plus size={17} /> Shape <ChevronDown size={13} /></button>
